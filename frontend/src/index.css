@@ -628,7 +628,87 @@ body {
 }
 
 .product-card {
+  position: relative;
   animation: rise 0.45s ease both;
+}
+
+.wish-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: rgba(255, 253, 248, 0.94);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s, color 0.15s, border-color 0.15s;
+  z-index: 2;
+}
+
+.wish-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wish-btn:hover {
+  transform: scale(1.08);
+  border-color: var(--ink);
+}
+
+.wish-btn.saved {
+  color: #b91c1c;
+  border-color: #f3c9c2;
+}
+
+.wish-btn:disabled {
+  cursor: wait;
+  opacity: 0.8;
+}
+
+.wish-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #d6cdb8;
+  border-top-color: var(--leaf);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.wish-text-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.wish-text-btn:hover {
+  color: #b91c1c;
+}
+
+.wish-text-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.wish-error {
+  font-size: 12.5px;
+  color: var(--danger);
+  margin-top: 6px;
 }
 
 .product-card.is-out .product-image-wrap img {
@@ -792,6 +872,28 @@ body {
   border: 1px dashed #d6cdb8;
   border-radius: 16px;
   background: rgba(255, 253, 248, 0.6);
+}
+
+.notice {
+  font-size: 13px;
+  color: #92400e;
+  background: #fef8ec;
+  border: 1px solid #f0dfb8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.notice-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--sans);
+  color: var(--leaf);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .empty-title {
@@ -984,8 +1086,80 @@ body {
   margin-bottom: 14px;
 }
 
-.details-cta {
+.details-actions {
+  display: flex;
+  gap: 10px;
   margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.details-actions .btn {
+  flex: 1;
+  min-width: 160px;
+}
+
+.details-cta {
+  margin-top: 0;
+}
+
+.btn-wish {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid #d6cdb8;
+}
+
+.btn-wish:hover {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.btn-wish.saved {
+  border-color: #b91c1c;
+  color: #b91c1c;
+  background: #fdf1ef;
+}
+
+.btn-wish:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.btn-remove {
+  margin-top: 10px;
+  background: transparent;
+  color: #b91c1c;
+  border: 1px solid #f3c9c2;
+  font-size: 13.5px;
+  padding: 10px 14px;
+  width: 100%;
+}
+
+.btn-remove:hover {
+  background: #fdf1ef;
+  border-color: #b91c1c;
+}
+
+.btn-remove:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.inline-btn {
+  width: auto;
+  padding: 12px 28px;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.empty-heart {
+  width: 52px;
+  height: 52px;
+  color: #d6cdb8;
+  margin: 0 auto 18px;
+}
+
+.wish-count {
+  margin-bottom: 22px;
 }
 
 .details-cta:disabled {

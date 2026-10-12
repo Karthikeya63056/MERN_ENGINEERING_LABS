@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
 
 function Register() {
@@ -7,6 +8,7 @@ function Register() {
   const [err, setErr] = useState('')
   const [loader, setLoader] = useState(false)
   const navigate = useNavigate()
+  const { setUser } = useAuth()
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -27,8 +29,11 @@ function Register() {
 
     setLoader(true)
     try {
-      await api.post('/customers/register', form)
-      navigate('/login', { replace: true })
+      // The backend sets the auth cookie on registration, so the session
+      // already exists — adopt it instead of leaving the UI logged out.
+      const response = await api.post('/customers/register', form)
+      setUser(response.data.customer || null)
+      navigate('/home', { replace: true })
     } catch (error) {
       console.log(error)
       setErr(error.response?.data?.message || 'Registration failed. Please try again.')

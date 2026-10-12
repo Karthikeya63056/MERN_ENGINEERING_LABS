@@ -12,7 +12,9 @@ const customerRoutes = express.Router();
 
 customerRoutes.post("/register", registerCustomer);
 customerRoutes.post("/login", loginCustomer);
-customerRoutes.post("/logout", isAuthenticated, logoutCustomer);
+// Intentionally unprotected: logout must always reach clearCookie(),
+// even when the JWT is expired, invalid or already gone.
+customerRoutes.post("/logout", logoutCustomer);
 customerRoutes.get("/me", isAuthenticated, getMe);
 customerRoutes.patch("/change-password", isAuthenticated, changePassword);
 

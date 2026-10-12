@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api from '../services/api'
+import { getWishlist, toggleWishlist } from '../services/wishlist'
 import Navbar from '../components/Navbar'
 import ProductCard from '../components/ProductCard'
 
@@ -10,6 +11,40 @@ function ProductDetails() {
   const [related, setRelated] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [savedIds, setSavedIds] = useState(new Set())
+  const [savingIds, setSavingIds] = useState(new Set())
+  const [wishErrors, setWishErrors] = useState({})
+
+  const handleToggleWishlist = async (productId) => {
+    if (savingIds.has(productId)) return
+    setSavingIds((prev) => new Set(prev).add(productId))
+    setWishErrors((prev) => {
+      const next = { ...prev }
+      delete next[productId]
+      return next
+    })
+    try {
+      const data = await toggleWishlist(productId)
+      setSavedIds((prev) => {
+        const next = new Set(prev)
+        if (data.saved) next.add(productId)
+        else next.delete(productId)
+        return next
+      })
+    } catch (error) {
+      console.log(error)
+      setWishErrors((prev) => ({ ...prev, [productId]: true }))
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(productId)
+        return next
+      })
+    }
+  }
+
+  const saved = product ? savedIds.has(product._id) : false
+  const saving = product ? savingIds.has(product._id) : false
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -19,6 +54,12 @@ function ProductDetails() {
       try {
         const response = await api.get(`/products/${id}`)
         setProduct(response.data.product)
+        try {
+          const wishlist = await getWishlist()
+          setSavedIds(new Set((wishlist.wishlist || []).map((p) => p._id)))
+        } catch {
+          setSavedIds(new Set())
+        }
       } catch (error) {
         console.log(error)
         if (error.response?.status === 404) {
@@ -83,9 +124,21 @@ function ProductDetails() {
                   />
                 </div>
               )}
-              <button type="button" className="btn btn-primary details-cta" disabled={product.stock === 0}>
-                Add to Cart
-              </button>
+              <div className="details-actions">
+                <button type="button" className="btn btn-primary details-cta" disabled={product.stock === 0}>
+                  Add to Cart
+                </button>
+                <button
+                  type="button"
+                  className={saved ? 'btn btn-wish saved' : 'btn btn-wish'}
+                  disabled={saving}
+                  onClick={() => handleToggleWishlist(product._id)}
+                  aria-pressed={saved}
+                >
+                  {saving ? 'Saving...' : saved ? '♥ Added to Wishlist' : '♡ Add to Wishlist'}
+                </button>
+              </div>
+              {product && wishErrors[product._id] && <p className="wish-error">Unable to save product. Please try again.</p>}
               <p className="assurance left">Free delivery over ₹999 · Easy 7-day returns</p>
             </div>
           </div>
@@ -99,7 +152,15 @@ function ProductDetails() {
             </div>
             <div className="product-grid">
               {related.map((p, i) => (
-                <ProductCard key={p._id} product={p} index={i} />
+                <ProductCard
+                  key={p._id}
+                  product={p}
+                  index={i}
+                  saved={savedIds.has(p._id)}
+                  saving={savingIds.has(p._id)}
+                  wishError={wishErrors[p._id] ? true : ''}
+                  onToggleWishlist={handleToggleWishlist}
+                />
               ))}
             </div>
           </section>

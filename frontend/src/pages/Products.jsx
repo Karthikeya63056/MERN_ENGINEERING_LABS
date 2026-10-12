@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../services/api'
+import { getWishlist, toggleWishlist } from '../services/wishlist'
 import Navbar from '../components/Navbar'
 import ProductCard from '../components/ProductCard'
 import SearchBar from '../components/SearchBar'
@@ -12,6 +13,37 @@ function Products() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [counts, setCounts] = useState({})
+  const [savedIds, setSavedIds] = useState(new Set())
+  const [savingIds, setSavingIds] = useState(new Set())
+  const [wishErrors, setWishErrors] = useState({})
+
+  const handleToggleWishlist = async (productId) => {
+    if (savingIds.has(productId)) return
+    setSavingIds((prev) => new Set(prev).add(productId))
+    setWishErrors((prev) => {
+      const next = { ...prev }
+      delete next[productId]
+      return next
+    })
+    try {
+      const data = await toggleWishlist(productId)
+      setSavedIds((prev) => {
+        const next = new Set(prev)
+        if (data.saved) next.add(productId)
+        else next.delete(productId)
+        return next
+      })
+    } catch (error) {
+      console.log(error)
+      setWishErrors((prev) => ({ ...prev, [productId]: true }))
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(productId)
+        return next
+      })
+    }
+  }
 
   const AISLES = ['All', 'Electronics', 'Fashion', 'Books', 'Home']
 
@@ -31,6 +63,24 @@ function Products() {
       .catch(() => {})
     return () => { live = false }
   }, [])
+
+  // Wishlist ids come from the backend — the source of truth, not local state.
+  // A failure here is shown (with retry) instead of silently leaving
+  // every heart in the wrong state.
+  const [wishStatusErr, setWishStatusErr] = useState(false)
+  const [wishStatusTries, setWishStatusTries] = useState(0)
+
+  useEffect(() => {
+    let live = true
+    getWishlist()
+      .then((data) => {
+        if (!live) return
+        setSavedIds(new Set((data.wishlist || []).map((p) => p._id)))
+        setWishStatusErr(false)
+      })
+      .catch(() => { if (live) setWishStatusErr(true) })
+    return () => { live = false }
+  }, [wishStatusTries])
 
   // Backend does the filtering — React only holds the input state.
   useEffect(() => {
@@ -123,6 +173,15 @@ function Products() {
 
         {!loading && err && <p className="error">{err}</p>}
 
+        {!loading && !err && wishStatusErr && (
+          <p className="notice">
+            Couldn&apos;t load your wishlist status — hearts may look unsaved.{' '}
+            <button type="button" className="notice-btn" onClick={() => setWishStatusTries((t) => t + 1)}>
+              Retry
+            </button>
+          </p>
+        )}
+
         {!loading && !err && products.length === 0 && (
           <div className="empty">
             <p className="empty-title">No products found.</p>
@@ -168,7 +227,15 @@ function Products() {
         {!loading && !err && products.length > 0 && (
           <div className="product-grid">
             {products.map((product, i) => (
-              <ProductCard key={product._id} product={product} index={i} />
+              <ProductCard
+                key={product._id}
+                product={product}
+                index={i}
+                saved={savedIds.has(product._id)}
+                saving={savingIds.has(product._id)}
+                wishError={wishErrors[product._id] ? true : ''}
+                onToggleWishlist={handleToggleWishlist}
+              />
             ))}
           </div>
         )}
