@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
 import { useCart } from '../context/CartContext'
@@ -6,10 +7,18 @@ import Navbar from '../components/Navbar'
 import ProductCard from '../components/ProductCard'
 import SearchBar from '../components/SearchBar'
 
+const VALID_AISLES = ['All Categories', 'Electronics', 'Fashion', 'Books', 'Home']
+
 function Products() {
+  // Deep links (e.g. Home aisle tiles → /products?category=Fashion) land
+  // pre-filtered; anything unknown falls back to All Categories.
+  const [searchParams] = useSearchParams()
+  const initialCategory = VALID_AISLES.includes(searchParams.get('category'))
+    ? searchParams.get('category')
+    : 'All Categories'
   const [products, setProducts] = useState([])
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All Categories')
+  const [category, setCategory] = useState(initialCategory)
   const [sort, setSort] = useState('')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')

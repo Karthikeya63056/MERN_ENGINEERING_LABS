@@ -82,7 +82,7 @@ function Cart() {
               <div className="summary-row"><span>Items</span><p>{count}</p></div>
               <div className="summary-row total"><span>Subtotal</span><p>₹{subtotal.toLocaleString('en-IN')}</p></div>
               <p className="summary-note">Shipping &amp; taxes calculated at checkout.</p>
-              <button type="button" className="btn btn-primary">Proceed to Checkout</button>
+              <Link to="/checkout" className="btn btn-primary ledger-cta" style={{ marginTop: 0 }}>Proceed to Checkout</Link>
               <Link to="/products" className="switch-link">Continue shopping →</Link>
             </aside>
           </div>

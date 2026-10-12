@@ -55,6 +55,9 @@ function Navbar() {
             <NavLink to="/cart" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               Cart{cartCount > 0 ? ` (${cartCount})` : ''}
             </NavLink>
+            <NavLink to="/orders" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              Orders
+            </NavLink>
             <div className="avatar-chip">
             <div className="avatar">{user.fullName?.charAt(0)?.toUpperCase()}</div>
             <span className="nav-user">{user.fullName}</span>

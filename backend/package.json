@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "test": "node tests/lab06-hardening.test.mjs"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -15,6 +16,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.0"
+    "mongoose": "^8.4.0",
+    "razorpay": "^2.9.8"
   }
 }
