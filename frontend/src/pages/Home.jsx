@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
 import Navbar from '../components/Navbar'
@@ -51,6 +51,7 @@ function Home() {
             <div className="ledger-row"><span>Email</span><p>{customer.email}</p></div>
             <div className="ledger-row"><span>Phone</span><p>{customer.phone}</p></div>
           </div>
+          <Link to="/products" className="btn btn-primary ledger-cta">Browse the shelves</Link>
           <p className="ledger-foot">“The festive collection arrives Friday.”</p>
         </div>
       </div>
