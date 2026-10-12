@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
+import { useCart } from '../context/CartContext'
 import Navbar from '../components/Navbar'
 import ProductCard from '../components/ProductCard'
 
 function ProductDetails() {
   const { id } = useParams()
+  const { addItem: addToCart, pendingIds: cartPending, itemErrors: cartErrors } = useCart()
   const [product, setProduct] = useState(null)
   const [related, setRelated] = useState([])
   const [loading, setLoading] = useState(true)
@@ -125,8 +127,13 @@ function ProductDetails() {
                 </div>
               )}
               <div className="details-actions">
-                <button type="button" className="btn btn-primary details-cta" disabled={product.stock === 0}>
-                  Add to Cart
+                <button
+                  type="button"
+                  className="btn btn-primary details-cta"
+                  disabled={product.stock === 0 || cartPending.has(product._id)}
+                  onClick={() => addToCart(product._id)}
+                >
+                  {cartPending.has(product._id) ? 'Adding...' : 'Add to Cart'}
                 </button>
                 <button
                   type="button"
@@ -139,6 +146,7 @@ function ProductDetails() {
                 </button>
               </div>
               {product && wishErrors[product._id] && <p className="wish-error">Unable to save product. Please try again.</p>}
+              {cartErrors[product._id] && <p className="wish-error" role="alert">{cartErrors[product._id]}</p>}
               <p className="assurance left">Free delivery over ₹999 · Easy 7-day returns</p>
             </div>
           </div>
@@ -160,6 +168,9 @@ function ProductDetails() {
                   saving={savingIds.has(p._id)}
                   wishError={wishErrors[p._id] ? true : ''}
                   onToggleWishlist={handleToggleWishlist}
+                  onAddToCart={addToCart}
+                  adding={cartPending.has(p._id)}
+                  cartError={cartErrors[p._id] || ''}
                 />
               ))}
             </div>

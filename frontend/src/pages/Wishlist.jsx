@@ -8,6 +8,7 @@ function Wishlist() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [removeErr, setRemoveErr] = useState('')
   const [removingIds, setRemovingIds] = useState(new Set())
 
   const fetchWishlist = useCallback(async () => {
@@ -30,13 +31,15 @@ function Wishlist() {
 
   const handleRemove = async (productId) => {
     if (removingIds.has(productId)) return
+    setRemoveErr('')
     setRemovingIds((prev) => new Set(prev).add(productId))
     try {
       await removeFromWishlist(productId)
       setItems((prev) => prev.filter((p) => p._id !== productId))
     } catch (error) {
       console.log(error)
-      setErr("We couldn't remove that product. Please try again.")
+      // Non-destructive: the grid stays, only a notice appears.
+      setRemoveErr("We couldn't remove that product. Please try again.")
     } finally {
       setRemovingIds((prev) => {
         const next = new Set(prev)
@@ -94,6 +97,10 @@ function Wishlist() {
             <p className="empty-sub">Save products you love and find them here later.</p>
             <Link to="/products" className="btn btn-primary inline-btn">Browse Products</Link>
           </div>
+        )}
+
+        {!loading && !err && removeErr && (
+          <p className="notice" role="alert">{removeErr}</p>
         )}
 
         {!loading && !err && items.length > 0 && (

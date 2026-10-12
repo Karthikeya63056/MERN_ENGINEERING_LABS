@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useCart } from '../context/CartContext'
 import { getWishlist } from '../services/wishlist'
 
 function Navbar() {
   const { user, logout } = useAuth()
+  const { count: cartCount } = useCart()
   const navigate = useNavigate()
-  const location = useLocation()
   const [wishCount, setWishCount] = useState(0)
 
   // Count always comes from the backend — never hardcoded.
-  // Refreshes on navigation AND immediately after any wishlist mutation
+  // Fetched on login and immediately after any wishlist mutation
   // (the service emits 'wishlist:changed'). Failures keep the last
   // known count rather than flashing a wrong zero.
   useEffect(() => {
@@ -30,7 +31,7 @@ function Navbar() {
       live = false
       window.removeEventListener('wishlist:changed', refresh)
     }
-  }, [user, location.pathname])
+  }, [user])
 
   const handleLogout = async () => {
     await logout()
@@ -50,6 +51,9 @@ function Navbar() {
             <NavLink to="/products" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>Products</NavLink>
             <NavLink to="/wishlist" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               Wishlist{wishCount > 0 ? ` (${wishCount})` : ''}
+            </NavLink>
+            <NavLink to="/cart" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              Cart{cartCount > 0 ? ` (${cartCount})` : ''}
             </NavLink>
             <div className="avatar-chip">
             <div className="avatar">{user.fullName?.charAt(0)?.toUpperCase()}</div>

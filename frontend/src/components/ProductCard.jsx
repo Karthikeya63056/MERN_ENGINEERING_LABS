@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-function ProductCard({ product, index = 0, saved = false, saving = false, wishError = '', onToggleWishlist = null }) {
+function ProductCard({ product, index = 0, saved = false, saving = false, wishError = '', onToggleWishlist = null, onAddToCart = null, adding = false, cartError = '' }) {
   const outOfStock = product.stock === 0
 
   return (
@@ -61,6 +61,17 @@ function ProductCard({ product, index = 0, saved = false, saving = false, wishEr
           </button>
         )}
         {wishError && <p className="wish-error">Unable to save product. Please try again.</p>}
+        {onAddToCart && (
+          <button
+            type="button"
+            className="btn btn-primary card-cart-btn"
+            disabled={adding || outOfStock}
+            onClick={() => onAddToCart(product._id)}
+          >
+            {adding ? 'Adding...' : 'Add to Cart'}
+          </button>
+        )}
+        {cartError && <p className="wish-error" role="alert">{cartError}</p>}
         <Link to={`/products/${product._id}`} className="card-link">
           View Details <span aria-hidden="true">→</span>
         </Link>

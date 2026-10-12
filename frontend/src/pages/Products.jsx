@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
+import { useCart } from '../context/CartContext'
 import Navbar from '../components/Navbar'
 import ProductCard from '../components/ProductCard'
 import SearchBar from '../components/SearchBar'
@@ -16,6 +17,7 @@ function Products() {
   const [savedIds, setSavedIds] = useState(new Set())
   const [savingIds, setSavingIds] = useState(new Set())
   const [wishErrors, setWishErrors] = useState({})
+  const { addItem: addToCart, pendingIds: cartPending, itemErrors: cartErrors } = useCart()
 
   const handleToggleWishlist = async (productId) => {
     if (savingIds.has(productId)) return
@@ -235,6 +237,9 @@ function Products() {
                 saving={savingIds.has(product._id)}
                 wishError={wishErrors[product._id] ? true : ''}
                 onToggleWishlist={handleToggleWishlist}
+                onAddToCart={addToCart}
+                adding={cartPending.has(product._id)}
+                cartError={cartErrors[product._id] || ''}
               />
             ))}
           </div>
