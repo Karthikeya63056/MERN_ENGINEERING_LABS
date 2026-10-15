@@ -11,8 +11,12 @@ payments hardening.
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_8-47A248?logo=mongodb&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 
-> **Status:** working local-development project. No CI, no license file, no deployment
-> configuration — see [Testing and quality](#testing-and-quality) and [License](#license).
+> **Status:** live in production (frontend on Vercel, API on Render — see
+> [Deployment](#deployment)) and working locally. No CI, no license file —
+> see [Testing and quality](#testing-and-quality) and [License](#license).
+
+**Live demo:** frontend at `https://mern-engineering-labs.vercel.app`,
+API at `https://mern-engineering-labs.onrender.com` (try `/health`).
 
 ## Contents
 
@@ -25,6 +29,7 @@ payments hardening.
 - [Data models](#data-models)
 - [Configuration](#configuration)
 - [Local setup](#local-setup)
+- [Deployment](#deployment)
 - [Scripts and workflow](#scripts-and-workflow)
 - [Testing and quality](#testing-and-quality)
 - [Troubleshooting](#troubleshooting)
@@ -62,7 +67,8 @@ Everything below was verified against the source code and, where noted, against 
 | Login / logout | Implemented | JWT in **HttpOnly, SameSite=Lax** cookie (7 days); logout endpoint intentionally public so it always clears the cookie |
 | Session persistence | Implemented | `AuthContext` hydrates via `GET /customers/me` on app load |
 | Route protection | Implemented | `ProtectedRoute` (guests → `/login`) and `PublicRoute` (signed-in users leave `/login`); signed-in 404 page |
-| Password change | Implemented (API) | `PATCH /customers/change-password` (auth required, bcrypt-verified) — **no frontend UI yet** |
+| Password change | Implemented (UI + API) | `/change-password` page (protected): current + new + confirm, bcrypt-verified server-side; session stays valid |
+| Profile page | Implemented | `/account`: read-only details from `/me`, account nav, shortcuts; profile edits have no backend endpoint, so none is offered |
 | Password recovery / OTP / social login | Not present | Deliberately absent from UI; no dead links |
 
 ### Backend capabilities
@@ -80,7 +86,7 @@ Everything below was verified against the source code and, where noted, against 
 |---|---|---|
 | UI framework | React 19 + React DOM | All pages and components |
 | Routing | react-router-dom 7 | Public/protected routes, deep-linkable search & category URLs, lazy route splitting |
-| HTTP client | axios 1 | Central instance (`frontend/src/services/api.js`) with `baseURL: http://localhost:8000`, `withCredentials: true` |
+| HTTP client | axios 1 | Central instance (`frontend/src/services/api.js`): `VITE_API_URL` with localhost fallback, `withCredentials: true` |
 | State | React Context | `AuthContext` (session), `CartContext` (single cart truth, derived count/subtotal), toast bus |
 | Styling | Hand-written CSS + design tokens | `frontend/src/index.css` — warm-paper / deep-green system, Fraunces + Inter |
 | Build / dev server | Vite | Dev on `:5173` (strict port), production build, route-level code splitting |
@@ -121,8 +127,9 @@ modal → `POST /orders/verify-payment` (HMAC check; cart clears **only here**) 
 ```text
 .
 ├── backend/
-│   ├── index.js                  # Express boot: CORS (:5173 + credentials),
-│   │                             # JSON + cookie parsing, five routers, :8000
+│   ├── index.js                  # Express boot: allowlist CORS (localhost + CLIENT_URL),
+│   │                             # JSON + cookie parsing, five routers, /health,
+│   │                             # dynamic PORT, binds 0.0.0.0
 │   ├── routes/                   # cart, customer, order, product, wishlist
 │   ├── controllers/              # request handling + business logic
 │   ├── models/                   # Customer, Product, Order (Mongoose)
@@ -134,14 +141,16 @@ modal → `POST /orders/verify-payment` (HMAC check; cart clears **only here**) 
     ├── src/
     │   ├── pages/                # Login, Register, Home, Products, ProductDetails,
     │   │                         # Cart, Checkout, Wishlist, Orders, OrderDetails,
-    │   │                         # OrderSuccess, NotFound
-    │   ├── components/           # Navbar, ProductCard, CartItem, SearchBar, Rail,
-    │   │                         # Reveal, Footer, Toast, ui.jsx primitives, …
+    │   │                         # OrderSuccess, Profile, ChangePassword, NotFound
+    │   ├── components/           # Navbar (account menu), ProductCard, CartItem, SearchBar,
+    │   │                         # Rail, Reveal, Footer, Toast, OrderCard, ui.jsx, …
     │   ├── context/              # AuthContext, CartContext
     │   ├── services/             # api.js + thin cart/wishlist/orders wrappers
     │   ├── App.jsx               # providers, lazy routes, 404 handling
     │   └── index.css             # the ShopKart design system
     ├── index.html                # title, meta, fonts (Fraunces + Inter)
+    ├── vercel.json               # SPA rewrite so deep links survive refresh
+    ├── .env.example              # VITE_API_URL default (placeholders only)
     └── vite.config.js            # dev server :5173 strictPort
 ```
 
@@ -181,7 +190,9 @@ Base URL `http://localhost:8000`. Auth = `isAuthenticated` (cookie JWT) unless n
 ## Authentication
 
 1. **Register** → bcrypt hash (cost 10) → `201`; duplicate email → `409 "Email already exists"`.
-2. **Login** → `bcrypt.compare` → `jwt.sign({userId}, 7d)` → `Set-Cookie: token=…; HttpOnly; SameSite=Lax; Max-Age=7d`.
+2. **Login** → `bcrypt.compare` → `jwt.sign({userId}, 7d)` → `Set-Cookie: token=…; HttpOnly`
+   with `SameSite=Lax` locally, or `SameSite=None; Secure` when `NODE_ENV=production`
+   (required for cross-site Vercel → Render cookies).
 3. **Session** — every protected call sends the cookie automatically (`withCredentials`);
    middleware verifies it, loads the customer (`-password`), and attaches `req.user`.
 4. **Frontend** — `AuthContext` hydrates from `/me`; `ProtectedRoute`/`PublicRoute` guard navigation.
@@ -214,10 +225,13 @@ erDiagram
 | `RAZORPAY_KEY_ID` | For checkout | backend | Test-Mode key id (only this ever reaches the frontend) |
 | `RAZORPAY_KEY_SECRET` | For checkout | backend | Stays server-side; missing keys → clean 503, boot unaffected |
 | `ADMIN_KEY` | For fulfilment | backend | Compared against the `x-admin-key` header |
+| `CLIENT_URL` | For production | backend | Allowed CORS origin (exact match — no trailing slash); localhost always allowed |
+| `NODE_ENV` | For production | backend | `production` switches cookies to `SameSite=None; Secure` |
+| `VITE_API_URL` | For production | frontend (Vercel) | API base URL, baked in at build time; defaults to `http://localhost:8000` |
 
 Copy `backend/.env.example` to `backend/.env` and fill values. Never commit `.env`
-(it is gitignored). The frontend needs no env file — the API URL is fixed in
-`frontend/src/services/api.js`.
+(it is gitignored). The frontend reads `VITE_API_URL` from its environment
+(`frontend/.env.example` documents the local default).
 
 ## Local setup
 
@@ -237,8 +251,27 @@ npm run dev                 # vite → http://localhost:5173
 ```
 
 Open `http://localhost:5173`, register an account, and shop. The API must stay on
-`:8000` — CORS allows only `http://localhost:5173` with credentials. Product images
-are remote Unsplash URLs, so the catalog needs internet access to look its best.
+`:8000` — local CORS allows `http://localhost:5173` (plus `CLIENT_URL` when set).
+Product images are remote Unsplash URLs, so the catalog needs internet access to look
+its best.
+
+## Deployment
+
+Live setup: **frontend on Vercel** (root `frontend`, Vite preset, `npm run build` → `dist`),
+**API on Render** (root `backend`, `npm install` / `npm start`, free tier),
+**database on MongoDB Atlas** (M0, network access `0.0.0.0/0` for Render's rotating IPs).
+
+| Platform | Setting | Value |
+|---|---|---|
+| Render | `dbURL`, `JWT_SECRET`, `RAZORPAY_KEY_ID/SECRET`, `ADMIN_KEY` | secrets from Atlas / generated |
+| Render | `CLIENT_URL` | exact Vercel origin, e.g. `https://shopkart.vercel.app` — no trailing slash (CORS compares exactly) |
+| Render | `NODE_ENV` | `production` (activates `SameSite=None; Secure` cookies) |
+| Vercel | `VITE_API_URL` | exact Render URL, e.g. `https://shopkart-api.onrender.com` — set **before** deploying (baked in at build) |
+
+Notes from the real deploy: `frontend/vercel.json` rewrites all routes to `index.html`
+so deep links survive refresh; `GET /health` is the smoke-test endpoint; Render free
+services sleep when idle (first request takes ~60s — normal); every `main` push
+redeploys both platforms.
 
 ## Scripts and workflow
 
@@ -259,8 +292,9 @@ are remote Unsplash URLs, so the catalog needs internet access to look its best.
   predates this documentation and was left untouched.
 - **Frontend tests:** no test runner is configured.
 - **What is verified:** `vite build` ✅ (observed passing), `oxlint` ✅ (warnings only,
-  no errors), plus live end-to-end API checks (register → login → wishlist/cart ops →
-  order reads; 401/400/404/409 paths) run during development.
+  no errors), plus live end-to-end checks against both local and production APIs
+  (register → login → password change → wishlist/cart ops → order reads;
+  401/400/404/409 paths; `SameSite=None; Secure` cookie flags in production).
 
 ## Troubleshooting
 
@@ -275,18 +309,21 @@ are remote Unsplash URLs, so the catalog needs internet access to look its best.
 | Blank product images | Remote Unsplash URLs unreachable offline; the UI renders a monogram fallback tile |
 | `npm test` module-not-found | Test file was deleted from the repo; nothing to run until tests are re-added |
 | Login loops back to `/login` | Backend down or CORS mismatch → confirm API on `:8000` and origin `http://localhost:5173` |
+| CORS errors in production console | `CLIENT_URL` ≠ exact frontend origin (trailing slash is a mismatch) → fix, wait for restart |
+| Production frontend calls `localhost` | `VITE_API_URL` missing when built → set it and **redeploy** (baked at build time) |
+| Slow first request in production | Render free-tier cold start (~60s) → wait and retry; not a failure |
 
 ## Security notes
 
-Implemented: bcrypt password hashing, HttpOnly + SameSite=Lax session cookies,
-server-side price/stock/total authority, signature-verified payments, admin-key-gated
-fulfilment, frontend/backend route guards. General guidance: keep `.env` uncommitted,
-use HTTPS and a restrictive CORS origin in production, and never expose Razorpay secrets
-to the client.
+Implemented: bcrypt password hashing, HttpOnly session cookies (`SameSite=Lax`
+locally, `SameSite=None; Secure` in production), server-side price/stock/total
+authority, signature-verified payments, admin-key-gated fulfilment, frontend/backend
+route guards. General guidance: keep `.env` uncommitted, use HTTPS and a restrictive
+CORS origin in production, and never expose Razorpay secrets to the client.
 
-Two observations for future hardening (documented, not changed): `POST /products` has
-no authentication, and the logout cookie clear uses `secure: false`, which suits local
-HTTP but must be revisited for HTTPS deployments.
+One observation for future hardening (documented, not changed): `POST /products` has
+no authentication — acceptable as a seeding path, but revisit before any public
+write access is needed.
 
 ## Contributing
 
@@ -309,11 +346,10 @@ licensed for reuse — maintainers should clarify the licensing status.
 Ideas only — none of this is committed or planned:
 
 - Re-add the backend hardening test suite (`npm test` currently has no target).
-- Frontend UI for `change-password` and admin fulfilment (both API-ready).
 - Pagination/virtualization if the catalog outgrows full-list fetching.
-- Refresh-token rotation and `Secure` cookie flag for production HTTPS.
+- Refresh-token rotation for long-lived sessions.
 - Authenticated/limited product management to replace the open `POST /products`.
-- CI (build + lint), a license file, and deployment docs.
+- CI (build + lint) and a license file.
 
 ---
 

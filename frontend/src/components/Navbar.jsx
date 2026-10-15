@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
@@ -19,6 +19,8 @@ function Navbar() {
   const [drawer, setDrawer] = useState(false)
   const [mobileSearch, setMobileSearch] = useState(false)
   const [popKey, setPopKey] = useState(0)
+  const [acctOpen, setAcctOpen] = useState(false)
+  const acctRef = useRef(null)
 
   // Wishlist count mirrors the backend; failures keep the last known value.
   useEffect(() => {
@@ -49,7 +51,24 @@ function Navbar() {
   useEffect(() => {
     setDrawer(false)
     setMobileSearch(false)
+    setAcctOpen(false)
   }, [location.pathname, location.search])
+  // Account menu: close on outside click or Escape.
+  useEffect(() => {
+    if (!acctOpen) return
+    const onDoc = (e) => {
+      if (acctRef.current && !acctRef.current.contains(e.target)) setAcctOpen(false)
+    }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setAcctOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [acctOpen])
   useEffect(() => {
     if (!drawer && !mobileSearch) return
     const onKey = (e) => {
@@ -99,12 +118,33 @@ function Navbar() {
                   Cart{cartCount > 0 && <span key={popKey} className="count-badge pop">{cartCount}</span>}
                 </NavLink>
                 <NavLink to="/orders" className={linkCls}>Orders</NavLink>
-                <div className="avatar-chip">
-                  <div className="avatar" aria-hidden="true">{user.fullName?.charAt(0)?.toUpperCase()}</div>
-                  <span className="nav-user">{user.fullName}</span>
-                  <button type="button" className="btn btn-outline" onClick={handleLogout}>
-                    Logout
+                <div className="avatar-chip acct" ref={acctRef}>
+                  <button
+                    type="button"
+                    className="acct-btn"
+                    onClick={() => setAcctOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={acctOpen}
+                    aria-label={`Account menu for ${user.fullName}`}
+                  >
+                    <span className="avatar" aria-hidden="true">{user.fullName?.charAt(0)?.toUpperCase()}</span>
+                    <span className="nav-user">{user.fullName}</span>
+                    <span className="acct-caret" aria-hidden="true">▾</span>
                   </button>
+                  {acctOpen && (
+                    <div className="acct-menu" role="menu" aria-label="Account">
+                      <p className="acct-meta">Signed in as<br /><strong>{user.fullName}</strong></p>
+                      <Link to="/account" className="acct-link" role="menuitem">
+                        My profile <span aria-hidden="true">→</span>
+                      </Link>
+                      <Link to="/change-password" className="acct-link" role="menuitem">
+                        Change password <span aria-hidden="true">→</span>
+                      </Link>
+                      <button type="button" className="btn btn-outline acct-logout" role="menuitem" onClick={handleLogout}>
+                        Logout
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -187,6 +227,8 @@ function Navbar() {
               <span>Cart{cartCount > 0 ? ` (${cartCount})` : ''}</span><span aria-hidden="true">→</span>
             </NavLink>
             <NavLink to="/orders" className={({ isActive }) => (isActive ? 'drawer-link active' : 'drawer-link')}>Orders <span aria-hidden="true">→</span></NavLink>
+            <NavLink to="/change-password" className={({ isActive }) => (isActive ? 'drawer-link active' : 'drawer-link')}>Change password <span aria-hidden="true">→</span></NavLink>
+            <NavLink to="/account" className={({ isActive }) => (isActive ? 'drawer-link active' : 'drawer-link')}>My profile <span aria-hidden="true">→</span></NavLink>
             <NavLink to="/checkout" className={({ isActive }) => (isActive ? 'drawer-link active' : 'drawer-link')}>Checkout <span aria-hidden="true">→</span></NavLink>
             <div className="drawer-head" style={{ marginTop: 12 }}>
               <p className="drawer-title" style={{ fontSize: 15 }}>Categories</p>

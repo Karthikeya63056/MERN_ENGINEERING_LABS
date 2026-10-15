@@ -19,6 +19,8 @@ const Checkout = lazy(() => import('./pages/Checkout'))
 const OrderSuccess = lazy(() => import('./pages/OrderSuccess'))
 const Orders = lazy(() => import('./pages/Orders'))
 const OrderDetails = lazy(() => import('./pages/OrderDetails'))
+const ChangePassword = lazy(() => import('./pages/ChangePassword'))
+const Profile = lazy(() => import('./pages/Profile'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 function App() {
@@ -40,6 +42,8 @@ function App() {
                 <Route path="/order-success/:id" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
                 <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                 <Route path="/orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+                <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+                <Route path="/account" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 {/* Signed-in users see a real 404; guests fall through to login. */}
                 <Route path="/404" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/404" replace />} />

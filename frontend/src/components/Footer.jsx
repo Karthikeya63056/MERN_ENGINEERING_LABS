@@ -22,6 +22,8 @@ function Footer() {
           <Link to="/cart" className="footer-link">My cart</Link>
           <Link to="/wishlist" className="footer-link">My wishlist</Link>
           <Link to="/orders" className="footer-link">My orders</Link>
+          <Link to="/account" className="footer-link">My profile</Link>
+          <Link to="/change-password" className="footer-link">Change password</Link>
           <Link to="/checkout" className="footer-link">Checkout</Link>
         </nav>
         <nav aria-label="Help">

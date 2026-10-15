@@ -9,12 +9,55 @@ export const NEXT_STAGE = {
   SHIPPED: 'DELIVERED',
 }
 
+// Normalize backend casing without losing unknown values.
+export const normStatus = (s) => String(s || '').toUpperCase()
+
+const STATUS_TONE = {
+  PENDING_PAYMENT: 'pending',
+  PLACED: 'processing',
+  CONFIRMED: 'processing',
+  SHIPPED: 'shipped',
+  DELIVERED: 'delivered',
+}
+
 export function StatusPill({ status }) {
-  const pending = status === 'PENDING_PAYMENT'
+  const key = normStatus(status)
+  const tone = STATUS_TONE[key] || ''
+  const label = key
+    ? key.charAt(0) + key.slice(1).toLowerCase().replace('_', ' ')
+    : 'Unknown'
   return (
-    <span className={pending ? 'status-pill pending' : 'status-pill'}>
+    <span className={tone ? `status-pill ${tone}` : 'status-pill'}>
       <span className="stock-dot" aria-hidden="true" />
-      {status?.replace('_', ' ')}
+      {label}
+    </span>
+  )
+}
+
+// Payment state is separate from fulfilment: a failed payment is not a
+// cancelled order, and a paid order is not necessarily delivered.
+export function PaymentPill({ paymentStatus }) {
+  const key = normStatus(paymentStatus)
+  if (key === 'PAID') {
+    return (
+      <span className="status-pill paid">
+        <span className="stock-dot" aria-hidden="true" />
+        Paid
+      </span>
+    )
+  }
+  if (key === 'FAILED') {
+    return (
+      <span className="status-pill failed">
+        <span className="stock-dot" aria-hidden="true" />
+        Payment failed
+      </span>
+    )
+  }
+  return (
+    <span className="status-pill pending">
+      <span className="stock-dot" aria-hidden="true" />
+      Payment pending
     </span>
   )
 }
