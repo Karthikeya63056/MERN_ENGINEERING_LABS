@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import api from '../services/api'
+import api, { warnApi } from '../services/api'
 import { SafeImage, inr } from '../components/ui'
 
 // Sign-in only. No signup logic, no password recovery, no social buttons —
@@ -53,9 +53,23 @@ function Login() {
       // Cookie (HttpOnly JWT) is stored by the browser automatically.
       const response = await api.post('/customers/login', form)
       setUser(response.data.customer || null)
+      // Confirm the session cookie actually stuck before leaving this page.
+      // Private/incognito windows often block cross-site cookies: login
+      // returns 200 but the cookie is dropped, so the next request 401s.
+      try {
+        await api.get('/customers/me')
+      } catch {
+        setUser(null)
+        setErr(
+          'Signed in, but your browser refused to keep the session cookie — ' +
+          'this happens in Incognito/private windows that block third-party cookies. ' +
+          'Allow cookies for this site (or use a normal window) and try again.',
+        )
+        return
+      }
       navigate('/home', { replace: true })
     } catch (error) {
-      console.log(error)
+      warnApi('login', error)
       if (error.response?.status === 401) {
         setErr('Invalid credentials')
       } else {

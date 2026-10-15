@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getOrders } from '../services/orders'
+import { warnApi } from '../services/api'
 import { normStatus } from '../components/OrderStatus'
 import OrderCard from '../components/OrderCard'
 import Navbar from '../components/Navbar'
@@ -36,7 +37,7 @@ function Orders() {
       const data = await getOrders()
       setOrders(Array.isArray(data.orders) ? data.orders : [])
     } catch (error) {
-      console.log(error)
+      warnApi('orders', error)
       setErr("We couldn't load your orders.")
     } finally {
       setLoading(false)

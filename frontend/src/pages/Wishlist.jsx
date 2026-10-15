@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getWishlist, removeFromWishlist } from '../services/wishlist'
+import { warnApi } from '../services/api'
 import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -22,7 +23,7 @@ function Wishlist() {
       const data = await getWishlist()
       setItems(data.wishlist || [])
     } catch (error) {
-      console.log(error)
+      warnApi('wishlist:load', error)
       setErr('Something went wrong.')
     } finally {
       setLoading(false)
@@ -42,7 +43,7 @@ function Wishlist() {
       setItems((prev) => prev.filter((p) => p._id !== productId))
       notify('Removed from your wishlist.')
     } catch (error) {
-      console.log(error)
+      warnApi('wishlist:remove', error)
       // Non-destructive: the grid stays, only a notice appears.
       setRemoveErr("We couldn't remove that product. Please try again.")
     } finally {

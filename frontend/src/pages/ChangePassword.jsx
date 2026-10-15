@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../services/api'
+import api, { warnApi } from '../services/api'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { Breadcrumbs } from '../components/ui'
@@ -48,7 +48,7 @@ function ChangePassword() {
       setDone(res.data?.message || 'Password changed successfully')
       setForm({ oldPassword: '', newPassword: '', confirm: '' })
     } catch (error) {
-      console.log(error)
+      warnApi('change-password', error)
       setErr(error.response?.data?.message || 'Could not change your password. Please try again.')
     } finally {
       setLoader(false)

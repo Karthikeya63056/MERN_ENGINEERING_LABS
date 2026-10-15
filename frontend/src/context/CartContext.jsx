@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { addToCart as apiAdd, getCart as apiGet, removeFromCart as apiRemove, updateCartQuantity as apiUpdate } from '../services/cart'
+import { warnApi } from '../services/api'
 
 const CartContext = createContext(null)
 
@@ -56,7 +57,7 @@ export const CartProvider = ({ children }) => {
       const data = await apiGet()
       applyCart(data.cart)
     } catch (err) {
-      console.log(err)
+      warnApi('cart:refresh', err)
       // Keep the last known items (if any) but flag the error: Cart.jsx
       // shows a "may be out of date" banner when items exist, and a full
       // error panel when the cart is empty. Never silently show stale data.
@@ -71,46 +72,58 @@ export const CartProvider = ({ children }) => {
     refresh()
   }, [refresh])
 
+  // Each mutation resolves null on success or an error message on failure,
+  // so callers can react honestly (e.g. only toast "Added" when it worked).
+  // A skipped duplicate (already pending) resolves undefined — not success.
   const addItem = useCallback(async (productId) => {
-    if (pendingIds.has(productId)) return
+    if (pendingIds.has(productId)) return undefined
     markPending(productId, true)
     setItemError(productId, '')
     try {
       const data = await apiAdd(productId)
       applyCart(data.cart)
+      return null
     } catch (err) {
-      console.log(err)
-      setItemError(productId, err.response?.data?.message || 'Unable to add to cart. Please try again.')
+      warnApi('cart:add', err)
+      const message = err.response?.data?.message || 'Unable to add to cart. Please try again.'
+      setItemError(productId, message)
+      return message
     } finally {
       markPending(productId, false)
     }
   }, [pendingIds, markPending, setItemError, applyCart])
 
   const updateQuantity = useCallback(async (productId, quantity) => {
-    if (pendingIds.has(productId)) return
+    if (pendingIds.has(productId)) return undefined
     markPending(productId, true)
     setItemError(productId, '')
     try {
       const data = await apiUpdate(productId, quantity)
       applyCart(data.cart)
+      return null
     } catch (err) {
-      console.log(err)
-      setItemError(productId, err.response?.data?.message || 'Unable to update quantity. Please try again.')
+      warnApi('cart:update', err)
+      const message = err.response?.data?.message || 'Unable to update quantity. Please try again.'
+      setItemError(productId, message)
+      return message
     } finally {
       markPending(productId, false)
     }
   }, [pendingIds, markPending, setItemError, applyCart])
 
   const removeItem = useCallback(async (productId) => {
-    if (pendingIds.has(productId)) return
+    if (pendingIds.has(productId)) return undefined
     markPending(productId, true)
     setItemError(productId, '')
     try {
       const data = await apiRemove(productId)
       applyCart(data.cart)
+      return null
     } catch (err) {
-      console.log(err)
-      setItemError(productId, err.response?.data?.message || "We couldn't remove that product. Please try again.")
+      warnApi('cart:remove', err)
+      const message = err.response?.data?.message || "We couldn't remove that product. Please try again."
+      setItemError(productId, message)
+      return message
     } finally {
       markPending(productId, false)
     }

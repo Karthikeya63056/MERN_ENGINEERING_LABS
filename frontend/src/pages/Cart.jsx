@@ -8,7 +8,7 @@ import { Breadcrumbs, inr } from '../components/ui'
 
 function Cart() {
   const { items, loading, error, refresh, updateQuantity, removeItem, pendingIds, itemErrors, count, subtotal } = useCart()
-  const { notify } = useToast()
+  const { notify, notifyError } = useToast()
 
   const handleIncrease = (productId, nextQty) => updateQuantity(productId, nextQty)
   // Decrease never goes below 1 — explicit Remove is required at qty 1.
@@ -18,8 +18,9 @@ function Cart() {
   }
   const handleRemove = async (productId) => {
     const name = items.find((it) => it.product._id === productId)?.product?.name
-    await removeItem(productId)
-    notify(name ? `Removed “${name}” from your cart.` : 'Removed from your cart.')
+    const failure = await removeItem(productId)
+    if (failure === null) notify(name ? `Removed “${name}” from your cart.` : 'Removed from your cart.')
+    else if (failure) notifyError(failure)
   }
 
   return (

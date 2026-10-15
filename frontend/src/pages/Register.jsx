@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../services/api'
+import api, { warnApi } from '../services/api'
 import { SafeImage, inr } from '../components/ui'
 
 // Account creation only: POST /customers/register with
@@ -52,7 +52,7 @@ function Register() {
       await api.post('/customers/register', form)
       navigate('/login', { replace: true })
     } catch (error) {
-      console.log(error)
+      warnApi('register', error)
       setErr(error.response?.data?.message || 'Registration failed. Please try again.')
     } finally {
       setLoader(false)

@@ -31,6 +31,14 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // A 401 anywhere means the session is dead (expired cookie, cleared
+  // server-side). Drop the user so the app stops pretending we're logged in.
+  useEffect(() => {
+    const onExpired = () => setUser(null)
+    window.addEventListener('auth:expired', onExpired)
+    return () => window.removeEventListener('auth:expired', onExpired)
+  }, [])
+
   return (
     <AuthContext.Provider value={{ user, setUser, loading, logout }}>
       {children}

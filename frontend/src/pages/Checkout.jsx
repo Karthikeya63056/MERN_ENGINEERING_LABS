@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { createPaymentOrder, verifyPayment, cancelOrder } from '../services/orders'
+import { warnApi } from '../services/api'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { Breadcrumbs } from '../components/ui'
@@ -78,6 +79,16 @@ function Checkout() {
       name: 'ShopKart',
       description: 'ShopKart Order',
       order_id: checkoutData.razorpayOrderId,
+      modal: {
+        // Closing the window without paying fires neither handler nor
+        // payment.failed — without this the CTA stays stuck on
+        // "Waiting for payment..." with no way to retry except reload.
+        ondismiss: () => {
+          setNotice('Payment window closed. Your cart is unchanged — try again when ready.')
+          setPaying(false)
+          setPlacing(false)
+        },
+      },
       // Razorpay's contact field wants exactly 10 Indian digits — the stored
       // phone may carry +91, spaces or a leading 0, so normalize it here.
       prefill: { name: address.fullName, contact: toRazorpayContact(address.phone) },
@@ -96,7 +107,7 @@ function Checkout() {
           await refresh()
           navigate(`/order-success/${checkoutData.shopKartOrderId}`, { replace: true })
         } catch (err) {
-          console.log(err)
+          warnApi('checkout:verify', err)
           setBackendError(err.response?.data?.message || 'Payment verification failed. Your cart has not been cleared.')
         } finally {
           setPaying(false)
@@ -106,7 +117,7 @@ function Checkout() {
     }
     const paymentObject = new window.Razorpay(options)
     paymentObject.on('payment.failed', (response) => {
-      console.log(response.error)
+      warnApi('checkout:payment-failed', response.error)
       // Close the loop: mark the pending order failed so it can't linger as
       // payable. Best-effort — the failure message shows regardless.
       cancelOrder(checkoutData.shopKartOrderId).catch(() => {})
@@ -137,7 +148,7 @@ function Checkout() {
       setNotice('Order reserved. Complete the payment to confirm it.')
       await openRazorpay(data, address)
     } catch (err) {
-      console.log(err)
+      warnApi('checkout:place-order', err)
       if (err.response?.status === 503) {
         setBackendError('Payments are not enabled yet (backend Razorpay Test keys missing). Your cart is unchanged — ask the backend owner to add keys and retry.')
       } else {
@@ -185,34 +196,34 @@ function Checkout() {
               <form className="form" onSubmit={handlePlaceOrder} noValidate>
                 <div>
                   <label htmlFor="fullName">Full Name</label>
-                  <input id="fullName" name="fullName" type="text" value={form.fullName} onChange={handleChange} placeholder="Aarav Sharma" />
+                  <input id="fullName" name="fullName" type="text" autoComplete="name" value={form.fullName} onChange={handleChange} placeholder="Aarav Sharma" />
                   {formErrors.fullName && <p className="wish-error">{formErrors.fullName}</p>}
                 </div>
                 <div>
                   <label htmlFor="phone">Phone Number</label>
-                  <input id="phone" name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="9876543210" />
+                  <input id="phone" name="phone" type="tel" autoComplete="tel" value={form.phone} onChange={handleChange} placeholder="9876543210" />
                   {formErrors.phone && <p className="wish-error">{formErrors.phone}</p>}
                 </div>
                 <div>
                   <label htmlFor="addressLine1">Address</label>
-                  <input id="addressLine1" name="addressLine1" type="text" value={form.addressLine1} onChange={handleChange} placeholder="22 MG Road" />
+                  <input id="addressLine1" name="addressLine1" type="text" autoComplete="street-address" value={form.addressLine1} onChange={handleChange} placeholder="22 MG Road" />
                   {formErrors.addressLine1 && <p className="wish-error">{formErrors.addressLine1}</p>}
                 </div>
                 <div className="form-row">
                   <div>
                     <label htmlFor="city">City</label>
-                    <input id="city" name="city" type="text" value={form.city} onChange={handleChange} placeholder="Bengaluru" />
+                    <input id="city" name="city" type="text" autoComplete="address-level2" value={form.city} onChange={handleChange} placeholder="Bengaluru" />
                     {formErrors.city && <p className="wish-error">{formErrors.city}</p>}
                   </div>
                   <div>
                     <label htmlFor="state">State</label>
-                    <input id="state" name="state" type="text" value={form.state} onChange={handleChange} placeholder="Karnataka" />
+                    <input id="state" name="state" type="text" autoComplete="address-level1" value={form.state} onChange={handleChange} placeholder="Karnataka" />
                     {formErrors.state && <p className="wish-error">{formErrors.state}</p>}
                   </div>
                 </div>
                 <div>
                   <label htmlFor="pincode">Pincode</label>
-                  <input id="pincode" name="pincode" type="text" inputMode="numeric" value={form.pincode} onChange={handleChange} placeholder="560001" />
+                  <input id="pincode" name="pincode" type="text" inputMode="numeric" autoComplete="postal-code" value={form.pincode} onChange={handleChange} placeholder="560001" />
                   {formErrors.pincode && <p className="wish-error">{formErrors.pincode}</p>}
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={placing || paying}>

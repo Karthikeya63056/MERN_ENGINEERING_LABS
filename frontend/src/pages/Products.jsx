@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import api from '../services/api'
+import api, { warnApi } from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../components/Toast'
@@ -64,7 +64,7 @@ function Products() {
       })
       notify(data.saved ? 'Saved to your wishlist.' : 'Removed from your wishlist.')
     } catch (error) {
-      console.log(error)
+      warnApi('products:wishlist', error)
       setWishErrors((prev) => ({ ...prev, [productId]: true }))
       notifyError('Unable to update your wishlist.')
     } finally {
@@ -131,7 +131,7 @@ function Products() {
         if (reqId.current !== id) return
         setProducts(response.data.products || [])
       } catch (error) {
-        console.log(error)
+        warnApi('products:list', error)
         if (reqId.current === id) setErr('Something went wrong while loading products.')
       } finally {
         if (reqId.current === id) setLoading(false)
@@ -334,8 +334,9 @@ function Products() {
                 wishError={wishErrors[product._id] ? true : ''}
                 onToggleWishlist={handleToggleWishlist}
                 onAddToCart={async (id) => {
-                  await addToCart(id)
-                  notify(`Added “${product.name}” to your cart.`)
+                  const failure = await addToCart(id)
+                  if (failure === null) notify(`Added “${product.name}” to your cart.`)
+                  else if (failure) notifyError(failure)
                 }}
                 adding={cartPending.has(product._id)}
                 cartError={cartErrors[product._id] || ''}

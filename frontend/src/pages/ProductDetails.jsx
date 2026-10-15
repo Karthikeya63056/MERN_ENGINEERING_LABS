@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import api from '../services/api'
+import api, { warnApi } from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../components/Toast'
@@ -42,7 +42,7 @@ function ProductDetails() {
       })
       notify(data.saved ? 'Saved to your wishlist.' : 'Removed from your wishlist.')
     } catch (error) {
-      console.log(error)
+      warnApi('product-details:wishlist', error)
       setWishErrors((prev) => ({ ...prev, [productId]: true }))
       notifyError('Unable to update your wishlist.')
     } finally {
@@ -56,6 +56,13 @@ function ProductDetails() {
 
   const saved = product ? savedIds.has(product._id) : false
   const saving = product ? savingIds.has(product._id) : false
+
+  // Toast only what actually happened — never "Added" on a failed request.
+  const announceAdd = async (productId, name) => {
+    const failure = await addToCart(productId)
+    if (failure === null) notify(`Added “${name}” to your cart.`)
+    else if (failure) notifyError(failure)
+  }
 
   useEffect(() => {
     let live = true
@@ -74,7 +81,7 @@ function ProductDetails() {
           if (live) setSavedIds(new Set())
         }
       } catch (error) {
-        console.log(error)
+        warnApi('product-details:load', error)
         if (!live) return
         if (error.response?.status === 404) {
           setErr('Product not found.')
@@ -152,10 +159,7 @@ function ProductDetails() {
                   type="button"
                   className="btn btn-primary details-cta"
                   disabled={product.stock === 0 || cartPending.has(product._id)}
-                  onClick={async () => {
-                    await addToCart(product._id)
-                    notify(`Added “${product.name}” to your cart.`)
-                  }}
+                  onClick={() => announceAdd(product._id, product.name)}
                 >
                   {cartPending.has(product._id) ? 'Adding...' : 'Add to Cart'}
                 </button>
@@ -181,10 +185,7 @@ function ProductDetails() {
               type="button"
               className="btn btn-primary"
               disabled={product.stock === 0 || cartPending.has(product._id)}
-              onClick={async () => {
-                await addToCart(product._id)
-                notify(`Added “${product.name}” to your cart.`)
-              }}
+              onClick={() => announceAdd(product._id, product.name)}
             >
               {cartPending.has(product._id) ? 'Adding...' : product.stock === 0 ? 'Unavailable' : 'Add to Cart'}
             </button>
@@ -212,10 +213,7 @@ function ProductDetails() {
                   saving={savingIds.has(p._id)}
                   wishError={wishErrors[p._id] ? true : ''}
                   onToggleWishlist={handleToggleWishlist}
-                  onAddToCart={async (pid) => {
-                    await addToCart(pid)
-                    notify(`Added “${p.name}” to your cart.`)
-                  }}
+                  onAddToCart={(pid) => announceAdd(pid, p.name)}
                   adding={cartPending.has(p._id)}
                   cartError={cartErrors[p._id] || ''}
                 />

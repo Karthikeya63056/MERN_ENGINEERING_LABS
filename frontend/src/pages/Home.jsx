@@ -95,8 +95,10 @@ function Home() {
   }
 
   const handleAdd = async (productId, name) => {
-    await addToCart(productId)
-    notify(`Added “${name}” to your cart.`)
+    const failure = await addToCart(productId)
+    if (failure === null) notify(`Added “${name}” to your cart.`)
+    else if (failure) notifyError(failure)
+    // undefined = duplicate click while pending; stay silent.
   }
 
   const cardProps = (product, i) => ({

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getOrderById, syncPayment } from '../services/orders'
+import { warnApi } from '../services/api'
 import { StatusPill, StatusTracker } from '../components/OrderStatus'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -25,7 +26,7 @@ function OrderDetails() {
       setOrder(data.order || order)
       setSyncMsg(data.message || 'Payment status refreshed.')
     } catch (error) {
-      console.log(error)
+      warnApi('order-details:sync', error)
       setSyncMsg(error.response?.data?.message || 'Could not refresh payment status.')
     } finally {
       setSyncing(false)
@@ -39,7 +40,7 @@ function OrderDetails() {
     getOrderById(id)
       .then((data) => { if (live) setOrder(data.order) })
       .catch((error) => {
-        console.log(error)
+        warnApi('order-details:load', error)
         if (live) setErr(error.response?.status === 404 ? 'Order not found.' : 'Something went wrong while loading this order.')
       })
       .finally(() => { if (live) setLoading(false) })
