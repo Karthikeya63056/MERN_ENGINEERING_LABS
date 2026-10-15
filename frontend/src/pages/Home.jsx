@@ -2,57 +2,35 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { useToast } from '../components/Toast'
 import api from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 import ProductCard from '../components/ProductCard'
+import Reveal from '../components/Reveal'
+import Rail from '../components/Rail'
+import { SafeImage, SkeletonGrid, inr } from '../components/ui'
 
 const AISLES = [
-  { name: 'Electronics', tagline: 'Light up your home', emoji: '✨' },
-  { name: 'Fashion', tagline: 'Dress for the dhamaka', emoji: '👗' },
-  { name: 'Books', tagline: 'Stories by the diya', emoji: '📚' },
-  { name: 'Home', tagline: 'Festive corners', emoji: '🪔' },
+  { name: 'Electronics', tagline: 'Everyday tech' },
+  { name: 'Fashion', tagline: 'Wear it well' },
+  { name: 'Books', tagline: 'Stories for the shelf' },
+  { name: 'Home', tagline: 'Corners that comfort' },
 ]
 
 const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'a', 'an', 'of', 'in', 'on', 'men', 'women', 'new', 'set'])
 
-// Next Sunday midnight, local time — the sale's real deadline.
-const nextDeadline = () => {
-  const d = new Date()
-  const daysLeft = (7 - d.getDay()) % 7 || 7
-  const end = new Date(d)
-  end.setDate(d.getDate() + daysLeft)
-  end.setHours(23, 59, 59, 0)
-  if (end <= d) end.setDate(end.getDate() + 7)
-  return end.getTime()
-}
-
-const pad = (n) => String(n).padStart(2, '0')
-
-function useCountdown() {
-  const [target] = useState(nextDeadline)
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-  const diff = Math.max(0, target - now)
-  return {
-    days: Math.floor(diff / 86400000),
-    hours: Math.floor(diff / 3600000) % 24,
-    mins: Math.floor(diff / 60000) % 60,
-    secs: Math.floor(diff / 1000) % 60,
-  }
-}
-
 function Home() {
   const { user, setUser } = useAuth()
   const { addItem: addToCart, pendingIds: cartPending, itemErrors: cartErrors } = useCart()
+  const { notify, notifyError } = useToast()
   const navigate = useNavigate()
   const [customer, setCustomer] = useState(user || null)
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [retryTick, setRetryTick] = useState(0)
   const [savedIds, setSavedIds] = useState(new Set())
   const [savingIds, setSavingIds] = useState(new Set())
   const [wishErrors, setWishErrors] = useState({})
@@ -85,7 +63,7 @@ function Home() {
       .then((data) => { if (live) setSavedIds(new Set((data.wishlist || []).map((p) => p._id))) })
       .catch(() => {})
     return () => { live = false }
-  }, [])
+  }, [retryTick])
 
   const handleToggleWishlist = async (productId) => {
     if (savingIds.has(productId)) return
@@ -103,8 +81,10 @@ function Home() {
         else next.delete(productId)
         return next
       })
+      notify(data.saved ? 'Saved to your wishlist.' : 'Removed from your wishlist.')
     } catch {
       setWishErrors((prev) => ({ ...prev, [productId]: true }))
+      notifyError('Unable to update your wishlist.')
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev)
@@ -114,6 +94,23 @@ function Home() {
     }
   }
 
+  const handleAdd = async (productId, name) => {
+    await addToCart(productId)
+    notify(`Added “${name}” to your cart.`)
+  }
+
+  const cardProps = (product, i) => ({
+    product,
+    index: i,
+    saved: savedIds.has(product._id),
+    saving: savingIds.has(product._id),
+    wishError: wishErrors[product._id] ? true : '',
+    onToggleWishlist: handleToggleWishlist,
+    onAddToCart: (id) => handleAdd(id, product.name),
+    adding: cartPending.has(product._id),
+    cartError: cartErrors[product._id] || '',
+  })
+
   const firstName = customer?.fullName?.split(' ')[0] || 'Guest'
   const inStock = products.filter((p) => p.stock > 0)
   const counts = {}
@@ -122,7 +119,7 @@ function Home() {
     counts[p.category] = (counts[p.category] || 0) + 1
     if (!firstImage[p.category] && p.image) firstImage[p.category] = p.image
   }
-  // Trending now: most frequent meaningful words in live product names —
+  // Popular right now: most frequent meaningful words in live product names —
   // every chip is guaranteed to return results.
   const trending = (() => {
     const freq = {}
@@ -133,51 +130,91 @@ function Home() {
     }
     return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([w]) => w)
   })()
-  const { days, hours, mins, secs } = useCountdown()
-  const bestsellers = [...inStock].sort((a, b) => b.stock - a.stock).slice(0, 8)
-  const steal = [...inStock].sort((a, b) => a.price - b.price)[0] || null
+  const freshPicks = [...inStock].slice(0, 10)
+  const valuePick = [...inStock].sort((a, b) => a.price - b.price)[0] || null
+  // Hero collage: three real in-stock products, spread across the catalog.
+  const heroes = [inStock[2], inStock[7], inStock[12]].filter(Boolean)
+  const heroTiles = heroes.length === 3 ? heroes : inStock.slice(0, 3)
 
   return (
     <div>
       <Navbar />
-      <main className="shop home">
-        <section className="fest-hero" aria-label="Festival of Lights Sale">
-          <div className="fest-diyas" aria-hidden="true">🪔 ✨ 🪔 ✨ 🪔</div>
-          <p className="eyebrow light">Namaste, {firstName} · The Festival of Lights Sale is live</p>
-          <h1 className="fest-title">Sajao apna ghar,<br />light up every corner.</h1>
-          <p className="fest-sub">
-            {products.length > 0
-              ? `${products.length} festive finds across ${Object.keys(counts).length} aisles — picked for everyday India.`
-              : 'Festive finds across four aisles — picked for everyday India.'}
-          </p>
-          <div className="fest-actions">
-            <Link to="/products" className="btn btn-gold">Shop the sale →</Link>
-            <Link to="/wishlist" className="btn btn-ghost-light">My wishlist ♥</Link>
+      <main className="shop home" id="main">
+        <section className="hero" aria-label="Welcome to ShopKart">
+          <div className="hero-grid">
+            <div>
+              <p className="hero-kicker">Namaste, {firstName} · The everyday store</p>
+              <h1 className="hero-title">Good things for every corner of <em>home.</em></h1>
+              <p className="hero-sub">
+                {products.length > 0
+                  ? `${products.length} finds across ${Object.keys(counts).length} aisles — live prices, live stock, no surprises at checkout.`
+                  : 'Four aisles of everyday finds — picked for everyday India.'}
+              </p>
+              <div className="hero-actions">
+                <Link to="/products" className="btn btn-primary inline-btn">Shop the shelves →</Link>
+                <Link to="/wishlist" className="btn btn-outline">My wishlist ♥</Link>
+              </div>
+              {products.length > 0 && (
+                <div className="hero-stats" aria-label="Store snapshot">
+                  <div className="hero-stat"><strong>{products.length}</strong><span>finds</span></div>
+                  <div className="hero-stat"><strong>{Object.keys(counts).length}</strong><span>aisles</span></div>
+                  <div className="hero-stat"><strong>{inStock.length}</strong><span>in stock</span></div>
+                </div>
+              )}
+              {trending.length > 0 && (
+                <div className="trend-row" aria-label="Popular right now">
+                  {trending.map((w) => (
+                    <Link key={w} to={`/products?search=${encodeURIComponent(w)}`} className="trend-chip">
+                      {w} <small>→</small>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            {heroTiles.length === 3 && (
+              <div className="hero-collage" aria-label="Featured products">
+                <Link to={`/products/${heroTiles[0]._id}`} className="hero-card tall" aria-label={`View ${heroTiles[0].name}`}>
+                  <SafeImage src={heroTiles[0].image} alt="" />
+                  <span className="hero-tag"><span>{heroTiles[0].name}</span><span>{inr(heroTiles[0].price)}</span></span>
+                </Link>
+                <Link to={`/products/${heroTiles[1]._id}`} className="hero-card a" aria-label={`View ${heroTiles[1].name}`}>
+                  <SafeImage src={heroTiles[1].image} alt="" />
+                  <span className="hero-tag"><span>{heroTiles[1].name}</span><span>{inr(heroTiles[1].price)}</span></span>
+                </Link>
+                <Link to={`/products/${heroTiles[2]._id}`} className="hero-card b" aria-label={`View ${heroTiles[2].name}`}>
+                  <SafeImage src={heroTiles[2].image} alt="" />
+                  <span className="hero-tag"><span>{heroTiles[2].name}</span><span>{inr(heroTiles[2].price)}</span></span>
+                </Link>
+              </div>
+            )}
           </div>
-          <p className="fest-urgency">✨ Extra festive prices · Ends Sunday midnight ✨</p>
         </section>
 
-        <section className="trust-strip" aria-label="Store promises">
-          <div><strong>🚚 Free delivery</strong><span>over ₹999</span></div>
-          <div><strong>↩️ 7-day returns</strong><span>no questions asked</span></div>
-          <div><strong>💳 Secure checkout</strong><span>Razorpay protected</span></div>
-        </section>
-
-        {loading && <p className="loading">Lighting the diyas...</p>}
+        {loading && (
+          <>
+            <p className="loading">Setting up the shelves...</p>
+            <SkeletonGrid count={8} />
+          </>
+        )}
         {!loading && err && (
           <div className="empty">
             <p className="empty-title">The shelves are unreachable.</p>
             <p className="empty-sub">{err}</p>
-            <Link to="/products" className="btn btn-primary inline-btn">Try the shelves directly</Link>
+            <button type="button" className="btn btn-primary inline-btn" onClick={() => setRetryTick((t) => t + 1)}>
+              Try Again
+            </button>
           </div>
         )}
 
         {!loading && !err && (
           <>
-            <section aria-label="Shop by category">
-              <div className="related-head">
-                <h2>Shop by aisle</h2>
-                <Link to="/products" className="switch-link">View all →</Link>
+            <Reveal as="section" aria-label="Shop by category">
+              <div className="sec-head">
+                <div>
+                  <p className="sec-kicker">Aisles</p>
+                  <h2 className="sec-title">Wander by <em>mood.</em></h2>
+                </div>
+                <Link to="/products" className="sec-link">View all →</Link>
               </div>
               <div className="aisle-grid">
                 {AISLES.map((a) => (
@@ -186,70 +223,70 @@ function Home() {
                     to={`/products?category=${encodeURIComponent(a.name)}`}
                     className="aisle-tile"
                   >
-                    <span className="aisle-emoji" aria-hidden="true">{a.emoji}</span>
+                    {firstImage[a.name] && (
+                      <SafeImage src={firstImage[a.name]} alt="" className="aisle-photo" />
+                    )}
+                    <span className="aisle-go" aria-hidden="true">→</span>
                     <strong>{a.name}</strong>
                     <span className="aisle-tag">{a.tagline}</span>
                     <span className="aisle-count big">{counts[a.name] || 0} finds</span>
                   </Link>
                 ))}
               </div>
-            </section>
+            </Reveal>
 
-            {steal && (
-              <section className="steal" aria-label="Festive steal of the day">
-                <div className="steal-badge">🔥 Festive steal</div>
+            {valuePick && (
+              <Reveal as="section" className="steal" aria-label="Great value pick">
+                <div className="steal-badge">Great value pick · Lowest price in stock</div>
                 <div className="steal-body">
-                  <img src={steal.image} alt={steal.name} loading="lazy" />
+                  <SafeImage src={valuePick.image} alt={valuePick.name} />
                   <div>
-                    <p className="product-category">{steal.category}</p>
-                    <h3>{steal.name}</h3>
-                    <p className="details-price">₹{steal.price.toLocaleString('en-IN')}</p>
-                    <p className="product-stock"><span className="stock-dot" aria-hidden="true" />{steal.stock} left — when it&apos;s gone, it&apos;s gone</p>
+                    <p className="product-category">{valuePick.category}</p>
+                    <h3>{valuePick.name}</h3>
+                    <p className="details-price">{inr(valuePick.price)}</p>
+                    <p className="product-stock"><span className="stock-dot" aria-hidden="true" />{valuePick.stock} in stock</p>
                     <div className="steal-actions">
                       <button
                         type="button"
                         className="btn btn-primary inline-btn"
-                        disabled={cartPending.has(steal._id)}
-                        onClick={() => addToCart(steal._id)}
+                        disabled={cartPending.has(valuePick._id)}
+                        onClick={() => handleAdd(valuePick._id, valuePick.name)}
                       >
-                        {cartPending.has(steal._id) ? 'Adding...' : 'Add to Cart'}
+                        {cartPending.has(valuePick._id) ? 'Adding...' : 'Add to Cart'}
                       </button>
-                      <Link to={`/products/${steal._id}`} className="btn btn-outline">View Details</Link>
+                      <Link to={`/products/${valuePick._id}`} className="btn btn-outline">View Details</Link>
                     </div>
                   </div>
                 </div>
-              </section>
+              </Reveal>
             )}
 
-            {bestsellers.length > 0 && (
-              <section aria-label="Bestsellers">
-                <div className="related-head">
-                  <h2>⭐ Bestsellers this Diwali</h2>
-                  <Link to="/products" className="switch-link">View all →</Link>
+            {freshPicks.length > 0 && (
+              <Reveal as="section" aria-label="Fresh picks">
+                <div className="sec-head">
+                  <div>
+                    <p className="sec-kicker">Just shelved</p>
+                    <h2 className="sec-title">Fresh picks, <em>in stock now.</em></h2>
+                  </div>
+                  <Link to="/products" className="sec-link">View all →</Link>
                 </div>
-                <div className="product-grid">
-                  {bestsellers.map((product, i) => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      index={i}
-                      saved={savedIds.has(product._id)}
-                      saving={savingIds.has(product._id)}
-                      wishError={wishErrors[product._id] ? true : ''}
-                      onToggleWishlist={handleToggleWishlist}
-                      onAddToCart={addToCart}
-                      adding={cartPending.has(product._id)}
-                      cartError={cartErrors[product._id] || ''}
-                    />
+                <Rail label="Fresh picks">
+                  {freshPicks.map((product, i) => (
+                    <ProductCard key={product._id} {...cardProps(product, i)} />
                   ))}
-                </div>
-              </section>
+                </Rail>
+              </Reveal>
             )}
 
-            <p className="ledger-foot">🪔 Shubh Deepavali from the ShopKart family — more festive drops Friday. 🪔</p>
+            <Reveal as="section" className="closer" aria-label="Keep browsing">
+              <h2>Still looking? The shelves <em>go on.</em></h2>
+              <p>Search {products.length} finds, filter by aisle and price, and check out securely when something catches your eye.</p>
+              <Link to="/products" className="btn btn-primary inline-btn">Browse everything →</Link>
+            </Reveal>
           </>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

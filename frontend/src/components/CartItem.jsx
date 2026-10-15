@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { QuantitySelector, SafeImage, inr } from './ui'
 
 function CartItem({ item, pending = false, itemError = '', onIncrease, onDecrease, onRemove }) {
   const product = item?.product
@@ -6,49 +7,37 @@ function CartItem({ item, pending = false, itemError = '', onIncrease, onDecreas
   if (!product) return null
 
   const qty = item.quantity || 1
-  const atMin = qty <= 1
   const atMax = qty >= (product.stock || 0)
   const lineTotal = (product.price || 0) * qty
 
   return (
     <article className="cart-item">
       <Link to={`/products/${product._id}`} className="cart-thumb" aria-label={`View ${product.name}`}>
-        <img src={product.image} alt={product.name} loading="lazy" />
+        <SafeImage src={product.image} alt={product.name} />
       </Link>
       <div className="cart-info">
         <p className="product-category">{product.category}</p>
         <h3 className="cart-name">
           <Link to={`/products/${product._id}`}>{product.name}</Link>
         </h3>
-        <p className="product-price">₹{(product.price || 0).toLocaleString('en-IN')}</p>
+        <p className="product-price">{inr(product.price)}</p>
         <p className={product.stock === 0 ? 'product-stock empty' : 'product-stock'}>
           <span className="stock-dot" aria-hidden="true" />
           {product.stock === 0 ? 'Currently unavailable' : `${product.stock} units available`}
         </p>
         <div className="qty-row">
-          <div className="qty-controls" role="group" aria-label={`Quantity for ${product.name}`}>
-            <button
-              type="button"
-              className="qty-btn"
-              disabled={pending || atMin}
-              onClick={() => onDecrease(product._id, qty - 1)}
-              aria-label="Decrease quantity"
-            >
-              −
-            </button>
-            <span className="qty-value" aria-live="polite">{pending ? '···' : qty}</span>
-            <button
-              type="button"
-              className="qty-btn"
-              disabled={pending || atMax}
-              onClick={() => onIncrease(product._id, qty + 1)}
-              aria-label="Increase quantity"
-              title={atMax ? `Only ${product.stock} units available` : 'Increase quantity'}
-            >
-              +
-            </button>
-          </div>
-          <p className="line-total">₹{lineTotal.toLocaleString('en-IN')}</p>
+          <QuantitySelector
+            value={qty}
+            max={product.stock || 0}
+            pending={pending}
+            label={`Quantity for ${product.name}`}
+            onChange={(next) => {
+              if (next < 1) return
+              if (next > qty) onIncrease(product._id, next)
+              else onDecrease(product._id, next)
+            }}
+          />
+          <p className="line-total">{inr(lineTotal)}</p>
         </div>
         {atMax && product.stock > 0 && (
           <p className="stock-note">Max available stock reached.</p>

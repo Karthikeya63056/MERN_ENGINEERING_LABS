@@ -1,15 +1,21 @@
 import { Link } from 'react-router-dom'
+import { SafeImage, inr } from './ui'
 
+// Signature card: square image-first composition, serif title, tabular price,
+// honest stock line. Navigation via image + title; heart + Add to Cart are
+// always visible (no hover-gated functionality on touch).
 function ProductCard({ product, index = 0, saved = false, saving = false, wishError = '', onToggleWishlist = null, onAddToCart = null, adding = false, cartError = '' }) {
   const outOfStock = product.stock === 0
+  const low = !outOfStock && product.stock <= 5
 
   return (
     <article
       className={outOfStock ? 'product-card is-out' : 'product-card'}
       style={{ animationDelay: `${Math.min(index, 11) * 45}ms` }}
+      aria-label={product.name}
     >
       <Link to={`/products/${product._id}`} className="product-image-wrap" aria-label={`View ${product.name}`}>
-        <img src={product.image} alt={product.name} loading="lazy" />
+        <SafeImage src={product.image} alt={product.name} />
         {outOfStock && <span className="stock-flag">Out of stock</span>}
       </Link>
       {onToggleWishlist && (
@@ -44,22 +50,12 @@ function ProductCard({ product, index = 0, saved = false, saving = false, wishEr
           <Link to={`/products/${product._id}`}>{product.name}</Link>
         </h3>
         <div className="product-meta">
-          <p className="product-price">₹{product.price.toLocaleString('en-IN')}</p>
-          <p className={outOfStock ? 'product-stock empty' : 'product-stock'}>
+          <p className="product-price">{inr(product.price)}</p>
+          <p className={outOfStock ? 'product-stock empty' : low ? 'product-stock low' : 'product-stock'}>
             <span className="stock-dot" aria-hidden="true" />
-            {outOfStock ? 'Out of stock' : `${product.stock} left`}
+            {outOfStock ? 'Out of stock' : low ? `Only ${product.stock} left` : `${product.stock} in stock`}
           </p>
         </div>
-        {onToggleWishlist && (
-          <button
-            type="button"
-            className="wish-text-btn"
-            disabled={saving}
-            onClick={() => onToggleWishlist(product._id)}
-          >
-            {saving ? 'Saving...' : saved ? '♥ Added to Wishlist' : '♡ Add to Wishlist'}
-          </button>
-        )}
         {wishError && <p className="wish-error">Unable to save product. Please try again.</p>}
         {onAddToCart && (
           <button
@@ -72,9 +68,6 @@ function ProductCard({ product, index = 0, saved = false, saving = false, wishEr
           </button>
         )}
         {cartError && <p className="wish-error" role="alert">{cartError}</p>}
-        <Link to={`/products/${product._id}`} className="card-link">
-          View Details <span aria-hidden="true">→</span>
-        </Link>
       </div>
     </article>
   )

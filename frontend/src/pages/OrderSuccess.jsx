@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getOrderById } from '../services/orders'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 function OrderSuccess() {
   const { id } = useParams()
@@ -21,7 +22,7 @@ function OrderSuccess() {
   return (
     <div>
       <Navbar />
-      <main className="shop">
+      <main className="shop" id="main">
         {loading && <p className="loading">Confirming your order...</p>}
         {!loading && err && <p className="error">{err}</p>}
         {/* Success is shown ONLY for verified-paid orders. A pending/failed
@@ -59,6 +60,7 @@ function OrderSuccess() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

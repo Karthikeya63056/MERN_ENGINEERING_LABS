@@ -1,32 +1,50 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { getWishlist, toggleWishlist } from '../services/wishlist'
 import { useCart } from '../context/CartContext'
+import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 import ProductCard from '../components/ProductCard'
 import SearchBar from '../components/SearchBar'
+import { Breadcrumbs, EmptyState, ErrorState, SkeletonGrid } from '../components/ui'
 
 const VALID_AISLES = ['All Categories', 'Electronics', 'Fashion', 'Books', 'Home']
+const PRICE_OPTIONS = [
+  { value: '', label: 'Any price' },
+  { value: '500', label: 'Under ₹500' },
+  { value: '1000', label: 'Under ₹1,000' },
+  { value: '5000', label: 'Under ₹5,000' },
+]
 
+// Data flow: search/category/sort run on the backend (GET /products?…).
+// maxPrice + in-stock-only refine the returned set client-side — they only
+// ever hide rows, never invent them. Stale responses are dropped by req id.
 function Products() {
-  // Deep links (e.g. Home aisle tiles → /products?category=Fashion) land
-  // pre-filtered; anything unknown falls back to All Categories.
-  const [searchParams] = useSearchParams()
-  const initialCategory = VALID_AISLES.includes(searchParams.get('category'))
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlSearch = searchParams.get('search') || ''
+  const urlCategory = VALID_AISLES.includes(searchParams.get('category'))
     ? searchParams.get('category')
     : 'All Categories'
+
   const [products, setProducts] = useState([])
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState(initialCategory)
+  const [search, setSearch] = useState(urlSearch)
+  const [category, setCategory] = useState(urlCategory)
   const [sort, setSort] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [retryTick, setRetryTick] = useState(0)
   const [counts, setCounts] = useState({})
   const [savedIds, setSavedIds] = useState(new Set())
   const [savingIds, setSavingIds] = useState(new Set())
   const [wishErrors, setWishErrors] = useState({})
   const { addItem: addToCart, pendingIds: cartPending, itemErrors: cartErrors } = useCart()
+  const { notify, notifyError } = useToast()
+  const reqId = useRef(0)
 
   const handleToggleWishlist = async (productId) => {
     if (savingIds.has(productId)) return
@@ -44,9 +62,11 @@ function Products() {
         else next.delete(productId)
         return next
       })
+      notify(data.saved ? 'Saved to your wishlist.' : 'Removed from your wishlist.')
     } catch (error) {
       console.log(error)
       setWishErrors((prev) => ({ ...prev, [productId]: true }))
+      notifyError('Unable to update your wishlist.')
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev)
@@ -57,9 +77,14 @@ function Products() {
   }
 
   const AISLES = ['All', 'Electronics', 'Fashion', 'Books', 'Home']
-
   const totalCount = Object.values(counts).reduce((s, v) => s + v, 0)
-  const hasFilters = search.trim() !== '' || category !== 'All Categories' || sort !== ''
+
+  // Adopt deep links (header search, home tiles, footer) when the URL changes.
+  useEffect(() => {
+    setSearch((s) => (s === urlSearch ? s : urlSearch))
+    setCategory((c) => (c === urlCategory ? c : urlCategory))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearch, urlCategory])
 
   // One unfiltered fetch for the aisle counts shown on the pills.
   useEffect(() => {
@@ -76,8 +101,6 @@ function Products() {
   }, [])
 
   // Wishlist ids come from the backend — the source of truth, not local state.
-  // A failure here is shown (with retry) instead of silently leaving
-  // every heart in the wrong state.
   const [wishStatusErr, setWishStatusErr] = useState(false)
   const [wishStatusTries, setWishStatusTries] = useState(0)
 
@@ -95,9 +118,8 @@ function Products() {
 
   // Backend does the filtering — React only holds the input state.
   useEffect(() => {
-    let cancelled = false
-
-    const fetchProducts = async () => {
+    const id = ++reqId.current
+    const timer = setTimeout(async () => {
       setLoading(true)
       setErr('')
       try {
@@ -106,35 +128,83 @@ function Products() {
         if (category !== 'All Categories') params.category = category
         if (sort) params.sort = sort
         const response = await api.get('/products', { params })
-        if (!cancelled) setProducts(response.data.products || [])
+        if (reqId.current !== id) return
+        setProducts(response.data.products || [])
       } catch (error) {
         console.log(error)
-        if (!cancelled) setErr('Something went wrong while loading products.')
+        if (reqId.current === id) setErr('Something went wrong while loading products.')
       } finally {
-        if (!cancelled) setLoading(false)
+        if (reqId.current === id) setLoading(false)
       }
-    }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [search, category, sort, retryTick])
 
-    // Small debounce so we don't fire a request on every keystroke.
-    const timer = setTimeout(fetchProducts, 350)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
+  // Keep the URL shareable without fighting the inputs above.
+  useEffect(() => {
+    const next = {}
+    if (search.trim()) next.search = search.trim()
+    if (category !== 'All Categories') next.category = category
+    const cur = Object.fromEntries([...searchParams])
+    if (JSON.stringify(cur) !== JSON.stringify(next)) {
+      setSearchParams(next, { replace: true })
     }
-  }, [search, category, sort])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, category])
+
+  // Client-side refinement of the returned set (real data only).
+  const visible = useMemo(() => {
+    let rows = products
+    if (inStockOnly) rows = rows.filter((p) => p.stock > 0)
+    if (maxPrice !== '') rows = rows.filter((p) => p.price <= Number(maxPrice))
+    return rows
+  }, [products, inStockOnly, maxPrice])
+
+  const hasFilters = search.trim() !== '' || category !== 'All Categories' || sort !== '' || maxPrice !== '' || inStockOnly
+  const clearAll = () => {
+    setSearch('')
+    setCategory('All Categories')
+    setSort('')
+    setMaxPrice('')
+    setInStockOnly(false)
+  }
+
+  const filterControls = (
+    <>
+      <label className="select-wrap" aria-label="Maximum price">
+        <select value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} aria-label="Filter by maximum price">
+          {PRICE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <svg className="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </label>
+      <label className="stock-toggle">
+        <input
+          type="checkbox"
+          checked={inStockOnly}
+          onChange={(e) => setInStockOnly(e.target.checked)}
+        />
+        In stock only
+      </label>
+    </>
+  )
 
   return (
     <div>
       <Navbar />
-      <main className="shop">
+      <main className="shop" id="main">
+        <Breadcrumbs trail={[{ label: 'Home', to: '/home' }, { label: 'Products' }]} />
         <div className="masthead">
           <div>
             <p className="eyebrow left">The shelves</p>
             <h1 className="shop-title">Everything in the store</h1>
-            <p className="shop-sub">A hundred goods, four aisles — picked for everyday India.</p>
+            <p className="shop-sub">Live prices and stock, straight from the catalog.</p>
           </div>
           <p className="shop-count" aria-live="polite">
-            {!loading && !err ? `${products.length} item${products.length === 1 ? '' : 's'}` : '···'}
+            {!loading && !err ? `${visible.length} item${visible.length === 1 ? '' : 's'}` : '···'}
           </p>
         </div>
 
@@ -167,22 +237,23 @@ function Products() {
           onSortChange={setSort}
         />
 
+        <div className="filter-row">
+          <button type="button" className="btn btn-outline filter-toggle" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog">
+            Filters{hasFilters ? ' •' : ''}
+          </button>
+          <div className="filter-row filter-inline" style={{ marginBottom: 0 }}>
+            {filterControls}
+          </div>
+        </div>
+
         {loading && (
           <>
             <p className="loading">Loading products...</p>
-            <div className="product-grid" aria-hidden="true">
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
-                <div key={n} className="skel-card">
-                  <div className="skel skel-img" />
-                  <div className="skel skel-line" />
-                  <div className="skel skel-line short" />
-                </div>
-              ))}
-            </div>
+            <SkeletonGrid count={8} />
           </>
         )}
 
-        {!loading && err && <p className="error">{err}</p>}
+        {!loading && err && <ErrorState sub={err} onRetry={() => setRetryTick((t) => t + 1)} />}
 
         {!loading && !err && wishStatusErr && (
           <p className="notice">
@@ -193,24 +264,27 @@ function Products() {
           </p>
         )}
 
-        {!loading && !err && products.length === 0 && (
-          <div className="empty">
-            <p className="empty-title">No products found.</p>
-            <p className="empty-sub">Try a different search, or browse the full shelves.</p>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => { setSearch(''); setCategory('All Categories'); setSort('') }}
-            >
+        {!loading && !err && visible.length === 0 && (
+          <EmptyState
+            title={products.length === 0 ? 'No products found.' : 'Nothing matches those filters.'}
+            sub={products.length === 0
+              ? 'Try a different search, or browse the full shelves.'
+              : 'Loosen the price or availability filters to see more.'}
+          />
+        )}
+
+        {!loading && !err && visible.length === 0 && (
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button type="button" className="btn btn-outline" onClick={clearAll}>
               Clear search &amp; filters
             </button>
           </div>
         )}
 
-        {!loading && !err && (
+        {!loading && !err && visible.length > 0 && (
           <div className="results-row">
             <p className="results-line" aria-live="polite">
-              Showing <strong>{products.length}</strong>
+              Showing <strong>{visible.length}</strong>
               {totalCount > 0 && <> of <strong>{totalCount}</strong></>}
             </p>
             {hasFilters && (
@@ -230,14 +304,27 @@ function Products() {
                     {sort === 'price_asc' ? 'Low to High' : 'High to Low'} <span aria-hidden="true">×</span>
                   </button>
                 )}
+                {maxPrice !== '' && (
+                  <button type="button" className="chip" onClick={() => setMaxPrice('')}>
+                    Under ₹{Number(maxPrice).toLocaleString('en-IN')} <span aria-hidden="true">×</span>
+                  </button>
+                )}
+                {inStockOnly && (
+                  <button type="button" className="chip" onClick={() => setInStockOnly(false)}>
+                    In stock only <span aria-hidden="true">×</span>
+                  </button>
+                )}
+                <button type="button" className="chip" onClick={clearAll}>
+                  Clear all <span aria-hidden="true">×</span>
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {!loading && !err && products.length > 0 && (
+        {!loading && !err && visible.length > 0 && (
           <div className="product-grid">
-            {products.map((product, i) => (
+            {visible.map((product, i) => (
               <ProductCard
                 key={product._id}
                 product={product}
@@ -246,7 +333,10 @@ function Products() {
                 saving={savingIds.has(product._id)}
                 wishError={wishErrors[product._id] ? true : ''}
                 onToggleWishlist={handleToggleWishlist}
-                onAddToCart={addToCart}
+                onAddToCart={async (id) => {
+                  await addToCart(id)
+                  notify(`Added “${product.name}” to your cart.`)
+                }}
                 adding={cartPending.has(product._id)}
                 cartError={cartErrors[product._id] || ''}
               />
@@ -254,6 +344,31 @@ function Products() {
           </div>
         )}
       </main>
+
+      {filtersOpen && (
+        <>
+          <button type="button" className="drawer-scrim" aria-label="Close filters" onClick={() => setFiltersOpen(false)} />
+          <div className="drawer left" role="dialog" aria-modal="true" aria-label="Filters">
+            <div className="drawer-head">
+              <p className="drawer-title">Filters</p>
+              <button type="button" className="drawer-close" aria-label="Close filters" onClick={() => setFiltersOpen(false)}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {filterControls}
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+              <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => setFiltersOpen(false)}>
+                Show {visible.length} result{visible.length === 1 ? '' : 's'}
+              </button>
+              <button type="button" className="btn btn-outline" onClick={clearAll}>
+                Reset
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <Footer />
     </div>
   )
 }

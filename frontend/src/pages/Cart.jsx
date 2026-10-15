@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
+import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 import CartItem from '../components/CartItem'
+import { Breadcrumbs, inr } from '../components/ui'
 
 function Cart() {
   const { items, loading, error, refresh, updateQuantity, removeItem, pendingIds, itemErrors, count, subtotal } = useCart()
+  const { notify } = useToast()
 
   const handleIncrease = (productId, nextQty) => updateQuantity(productId, nextQty)
   // Decrease never goes below 1 — explicit Remove is required at qty 1.
@@ -12,11 +16,17 @@ function Cart() {
     if (nextQty < 1) return
     updateQuantity(productId, nextQty)
   }
+  const handleRemove = async (productId) => {
+    const name = items.find((it) => it.product._id === productId)?.product?.name
+    await removeItem(productId)
+    notify(name ? `Removed “${name}” from your cart.` : 'Removed from your cart.')
+  }
 
   return (
     <div>
       <Navbar />
-      <main className="shop">
+      <main className="shop" id="main">
+        <Breadcrumbs trail={[{ label: 'Home', to: '/home' }, { label: 'Cart' }]} />
         <p className="eyebrow left">Ready to buy</p>
         <h1 className="shop-title">My Cart</h1>
 
@@ -73,14 +83,14 @@ function Cart() {
                   itemError={itemErrors[item.product._id] || ''}
                   onIncrease={handleIncrease}
                   onDecrease={handleDecrease}
-                  onRemove={removeItem}
+                  onRemove={handleRemove}
                 />
               ))}
             </section>
             <aside className="summary" aria-label="Order summary">
               <h2>Order Summary</h2>
               <div className="summary-row"><span>Items</span><p>{count}</p></div>
-              <div className="summary-row total"><span>Subtotal</span><p>₹{subtotal.toLocaleString('en-IN')}</p></div>
+              <div className="summary-row total"><span>Subtotal</span><p>{inr(subtotal)}</p></div>
               <p className="summary-note">Shipping &amp; taxes calculated at checkout.</p>
               <Link to="/checkout" className="btn btn-primary ledger-cta" style={{ marginTop: 0 }}>Proceed to Checkout</Link>
               <Link to="/products" className="switch-link">Continue shopping →</Link>
@@ -88,6 +98,7 @@ function Cart() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

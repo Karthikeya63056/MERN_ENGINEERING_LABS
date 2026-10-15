@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { createPaymentOrder, verifyPayment, cancelOrder } from '../services/orders'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
+import { Breadcrumbs } from '../components/ui'
 
 const EMPTY_FORM = { fullName: '', phone: '', addressLine1: '', city: '', state: '', pincode: '' }
 
@@ -148,9 +150,21 @@ function Checkout() {
   return (
     <div>
       <Navbar />
-      <main className="shop">
+      <main className="shop" id="main">
+        <Breadcrumbs trail={[
+          { label: 'Home', to: '/home' },
+          { label: 'Cart', to: '/cart' },
+          { label: 'Checkout' },
+        ]} />
         <p className="eyebrow left">Almost yours</p>
         <h1 className="shop-title">Checkout</h1>
+        {!cartLoading && items.length > 0 && (
+          <ol className="steps" aria-label="Checkout progress">
+            <li className="step now">1 · Shipping details</li>
+            <li className={paying || placing ? 'step now' : 'step'}>2 · Payment</li>
+            <li className="step">3 · Confirmation</li>
+          </ol>
+        )}
 
         {cartLoading && <p className="loading">Loading your cart...</p>}
 
@@ -221,6 +235,7 @@ function Checkout() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

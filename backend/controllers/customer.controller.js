@@ -2,11 +2,23 @@ import Customer from "../models/customer.model.js";
 import bcrypt from "bcrypt";
 import generateToken from "../utils/generateToken.js";
 
+// Cross-site production cookies (Vercel frontend -> Render API) require
+// SameSite=None + Secure; localhost keeps the lax/insecure pair.
+const isProduction = process.env.NODE_ENV === "production";
+
 const cookieOptions = {
     httpOnly: true,
-    sameSite: "lax",
-    secure: false,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
+    path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000
+};
+
+const clearCookieOptions = {
+    httpOnly: true,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
+    path: "/"
 };
 
 // Register Customer
@@ -51,7 +63,7 @@ export const loginCustomer = async (req, res) => {
 
 // Logout Customer
 export const logoutCustomer = (req, res) => {
-    res.clearCookie("token", { httpOnly: true, sameSite: "lax", secure: false });
+    res.clearCookie("token", clearCookieOptions);
     return res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 

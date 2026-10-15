@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { getOrders } from '../services/orders'
 import { StatusPill } from '../components/OrderStatus'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
+import { Breadcrumbs } from '../components/ui'
 
 const fmtDate = (iso) => {
   try {
@@ -38,7 +40,8 @@ function Orders() {
   return (
     <div>
       <Navbar />
-      <main className="shop">
+      <main className="shop" id="main">
+        <Breadcrumbs trail={[{ label: 'Home', to: '/home' }, { label: 'Orders' }]} />
         <p className="eyebrow left">Purchase history</p>
         <h1 className="shop-title">My Orders</h1>
 
@@ -87,6 +90,7 @@ function Orders() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

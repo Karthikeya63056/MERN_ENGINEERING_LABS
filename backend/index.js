@@ -12,7 +12,8 @@ import orderRoutes from "./routes/order.routes.js";
 dotenv.config();
 
 const app = express();
-const port = 8000;
+// Render (and most hosts) assign the port at runtime.
+const port = process.env.PORT || 8000;
 
 if (!process.env.dbURL && !process.env.MONGO_URI) {
   console.error("Missing required environment variables: dbURL");
@@ -33,12 +34,23 @@ mongoose
     console.log(err);
   });
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-  }),
+// Production origins come from env; localhost always stays allowed so
+// local development keeps working unchanged.
+const allowedOrigins = ["http://localhost:5173", process.env.CLIENT_URL].filter(
+  Boolean,
 );
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
@@ -49,7 +61,12 @@ app.use("/wishlist", wishlistRoutes);
 app.use("/cart", cartRoutes);
 app.use("/orders", orderRoutes);
 
-app.listen(port, () => {
+// Health probe for hosts (Render) and humans: GET /health.
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Server is running" });
+});
+
+app.listen(port, "0.0.0.0", () => {
   console.log(`Server Started at ${port}`);
 });
 

@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { getOrderById, syncPayment } from '../services/orders'
 import { StatusPill, StatusTracker } from '../components/OrderStatus'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
+import { Breadcrumbs, SafeImage } from '../components/ui'
 
 function OrderDetails() {
   const { id } = useParams()
@@ -47,12 +49,12 @@ function OrderDetails() {
   return (
     <div>
       <Navbar />
-      <main className="shop">
-        <nav className="crumbs" aria-label="Breadcrumb">
-          <Link to="/orders">My Orders</Link>
-          <span aria-hidden="true">/</span>
-          <span>Details</span>
-        </nav>
+      <main className="shop" id="main">
+        <Breadcrumbs trail={[
+          { label: 'Home', to: '/home' },
+          { label: 'Orders', to: '/orders' },
+          { label: 'Details' },
+        ]} />
 
         {loading && <p className="loading">Loading order...</p>}
         {!loading && err && <p className="error">{err}</p>}
@@ -81,7 +83,7 @@ function OrderDetails() {
                   <article key={it.product} className="cart-item">
                     {it.image && (
                       <Link to={`/products/${it.product}`} className="cart-thumb">
-                        <img src={it.image} alt={it.name} loading="lazy" />
+                        <SafeImage src={it.image} alt={it.name} />
                       </Link>
                     )}
                     <div className="cart-info">
@@ -106,6 +108,7 @@ function OrderDetails() {
           </>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getWishlist, removeFromWishlist } from '../services/wishlist'
+import { useToast } from '../components/Toast'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 import WishlistCard from '../components/WishlistCard'
+import { Breadcrumbs } from '../components/ui'
 
 function Wishlist() {
+  const { notify } = useToast()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -36,6 +40,7 @@ function Wishlist() {
     try {
       await removeFromWishlist(productId)
       setItems((prev) => prev.filter((p) => p._id !== productId))
+      notify('Removed from your wishlist.')
     } catch (error) {
       console.log(error)
       // Non-destructive: the grid stays, only a notice appears.
@@ -52,7 +57,8 @@ function Wishlist() {
   return (
     <div>
       <Navbar />
-      <main className="shop">
+      <main className="shop" id="main">
+        <Breadcrumbs trail={[{ label: 'Home', to: '/home' }, { label: 'Wishlist' }]} />
         <p className="eyebrow left">Saved for later</p>
         <h1 className="shop-title">My Wishlist</h1>
 
@@ -122,6 +128,7 @@ function Wishlist() {
           </>
         )}
       </main>
+      <Footer />
     </div>
   )
 }
